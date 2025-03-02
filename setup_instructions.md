@@ -11,7 +11,7 @@ This document provides instructions for setting up the environment required to r
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/PPI_GNN.git
+   git clone https://github.com/michaelajao/PPI_GNN.git
    cd PPI_GNN
    ```
 
