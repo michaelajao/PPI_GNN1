@@ -1,4 +1,3 @@
-
 # note that this custom dataset is not prepared on the top of geometric Dataset(pytorch's inbuilt)
 import os
 import torch
@@ -11,12 +10,20 @@ from os.path import isfile, join
 
 
 
-processed_dir="../human_features/processed/"
-npy_file = "../human_features/npy_file_new(human_dataset).npy"
+processed_dir="human_features/processed/"
+npy_file = "human_features/npy_file_new(human_dataset).npy"
 npy_ar = np.load(npy_file)
 print(npy_ar.shape)
+print(f"Processed directory exists: {os.path.exists(processed_dir)}")
+print(f"Number of .pt files: {len(glob.glob(os.path.join(processed_dir, '*.pt')))}")
+print(f"First few protein IDs: {list(npy_ar[:,2][:5])}")
+
 from torch.utils.data import Dataset as Dataset_n
 from torch_geometric.data import DataLoader as DataLoader_n
+from torch_geometric.data import Data
+
+def bump(g):
+    return Data.from_dict(g.__dict__)
 
 class LabelledDataset(Dataset_n):
     def __init__(self, npy_file, processed_dir):
@@ -31,13 +38,24 @@ class LabelledDataset(Dataset_n):
       return(self.n_samples)
 
     def __getitem__(self, index):
-      prot_1 = os.path.join(self.processed_dir, self.protein_1[index]+".pt")
-      prot_2 = os.path.join(self.processed_dir, self.protein_2[index]+".pt")
-      #print(f'Second prot is {prot_2}')
-      prot_1 = torch.load(glob.glob(prot_1)[0])
-      #print(f'Here lies {glob.glob(prot_2)}')
-      prot_2 = torch.load(glob.glob(prot_2)[0])
-      return prot_1, prot_2, torch.tensor(self.label[index])
+        # Get file paths
+        prot_1_path = os.path.join(self.processed_dir, self.protein_1[index]+".pt")
+        prot_2_path = os.path.join(self.processed_dir, self.protein_2[index]+".pt")
+        
+        # Check if files exist directly instead of using glob
+        if not os.path.exists(prot_1_path):
+            raise FileNotFoundError(f"Protein 1 file not found: {prot_1_path}")
+        if not os.path.exists(prot_2_path):
+            raise FileNotFoundError(f"Protein 2 file not found: {prot_2_path}")
+            
+        # Load the protein data and convert to new format
+        try:
+            prot_1 = bump(torch.load(prot_1_path))
+            prot_2 = bump(torch.load(prot_2_path))
+        except Exception as e:
+            raise RuntimeError(f"Error loading protein files: {str(e)}")
+            
+        return prot_1, prot_2, torch.tensor(self.label[index])
 
 
 

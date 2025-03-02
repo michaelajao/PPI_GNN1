@@ -17,14 +17,15 @@ import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
 
-device = torch.device("cuda:0") if torch.cuda.is_available() else torch.cuda("cpu")
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
 from Bio import SeqIO
 from Bio.PDB.PDBParser import PDBParser
 
 
-ftrs = np.load("../human_features/pdb_to_seqvec_dict.npy", allow_pickle=True)
+# ftrs = np.load("human_features/pdb_to_seqvec_dict.npy", allow_pickle=True)
 
 
 # list of 20 proteins
@@ -229,4 +230,4 @@ class ProteinDataset(Dataset):
         return torch.tensor(np.hstack((one_hot_symb, res_ftrs_out)), dtype = torch.float)
           
         
-prot_graphs = ProteinDataset("../human_features/")
+prot_graphs = ProteinDataset("human_features/")
