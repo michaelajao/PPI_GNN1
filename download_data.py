@@ -18,7 +18,7 @@ def download_and_extract():
         
         # Extract the zip file
         with zipfile.ZipFile(output, 'r') as zip_ref:
-            zip_ref.extractall('../PPI_GNN/human_features/processed')
+            zip_ref.extractall('../PPI_GNN/human_features')
             
         # Clean up the zip file
         os.remove(output)
