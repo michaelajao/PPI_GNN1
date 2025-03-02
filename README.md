@@ -125,7 +125,7 @@ The `train.py` script automatically generates visualizations in the `visualizati
 - Performance metrics at different thresholds
 - Results summary
 
-## Citation
+<!-- ## Citation
 
 If you use this code in your research, please cite:
 
@@ -140,4 +140,4 @@ If you use this code in your research, please cite:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details. -->
