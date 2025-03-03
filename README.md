@@ -20,6 +20,25 @@ conda env create -f ppi_env.yml
 conda activate ppi_env
 ```
 
+Install PyTorch with CUDA support:
+
+```bash
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+Install PyTorch Geometric:
+
+```bash
+pip3 install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
+pip3 install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
+pip3 install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
+pip3 install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
+pip3 install torch-geometric
+```   
+
+
+pip install gdown matplotlib seaborn scikit-learn torch_optimizer
+
 ### Dependencies
 
 Key dependencies include:
@@ -36,6 +55,13 @@ Key dependencies include:
 1. **Human PPI Dataset**:
    - Download the human features file from the link in `Human_features/README.md`
    - Place the files in `../human_features/processed/`
+
+To download the pre-processed data, run the following command:
+
+```python
+python download_data.py
+```   
+
 
 2. **S. cerevisiae PPI Dataset**:
    - Download the input feature file from the link in `S. cerevisiae/README.md`

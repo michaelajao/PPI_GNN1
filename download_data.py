@@ -5,7 +5,8 @@ import shutil
 
 def download_and_extract():
     # Create directories if they don't exist
-    os.makedirs('../PPI_GNN/human_features/processed', exist_ok=True)
+    processed_dir = '../PPI_GNN1/human_features/processed'
+    os.makedirs(processed_dir, exist_ok=True)
     
     # Google Drive file ID
     file_id = '1mpMB2Gu6zH6W8fZv-vGwTj_mmeitIV2-'
@@ -16,9 +17,9 @@ def download_and_extract():
         url = f'https://drive.google.com/uc?id={file_id}'
         gdown.download(url, output, quiet=False)
         
-        # Extract the zip file
+        # Extract the zip file directly to the processed directory
         with zipfile.ZipFile(output, 'r') as zip_ref:
-            zip_ref.extractall('../PPI_GNN/human_features')
+            zip_ref.extractall(processed_dir)
             
         # Clean up the zip file
         os.remove(output)
