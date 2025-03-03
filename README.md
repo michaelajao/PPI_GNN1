@@ -26,27 +26,12 @@ Install PyTorch with CUDA support:
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
-Install PyTorch Geometric:
+Install additional packages:
 
 ```bash
-pip3 install torch-scatter -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
-pip3 install torch-sparse -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
-pip3 install torch-cluster -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
-pip3 install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-1.9.0+cu111.html
-pip3 install torch-geometric
-```   
+pip install gdown matplotlib seaborn scikit-learn 
+```
 
-
-pip install gdown matplotlib seaborn scikit-learn torch_optimizer
-
-### Dependencies
-
-Key dependencies include:
-- PyTorch
-- PyTorch Geometric
-- scikit-learn
-- matplotlib
-- seaborn
 
 ## Data Preparation
 
