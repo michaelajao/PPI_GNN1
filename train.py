@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import argparse  # Add this import
+import json
+import datetime
 
 from tqdm import tqdm
 import math
@@ -173,8 +175,8 @@ def predict(model, device, loader):
     # Move to CPU for numpy operations
     return labels.cpu().numpy().flatten(), predictions.cpu().numpy().flatten()
 
-# Visualization functions
-def plot_learning_curves(train_losses, val_losses, train_accs, val_accs):
+# Enhanced visualization functions
+def plot_learning_curves(train_losses, val_losses, train_accs, val_accs, save_dir, model_name):
     """Plot learning curves for loss and accuracy"""
     plt.figure(figsize=(12, 5))
     
@@ -184,7 +186,7 @@ def plot_learning_curves(train_losses, val_losses, train_accs, val_accs):
     plt.plot(val_losses, label='Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss (MSE)')
-    plt.title('Loss Curves')
+    plt.title(f'{model_name} - Loss Curves')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
     
@@ -194,16 +196,16 @@ def plot_learning_curves(train_losses, val_losses, train_accs, val_accs):
     plt.plot(val_accs, label='Validation Accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy (%)')
-    plt.title('Accuracy Curves')
+    plt.title(f'{model_name} - Accuracy Curves')
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.6)
     
     plt.tight_layout()
-    plt.savefig('visualizations/learning_curves.png')
+    plt.savefig(os.path.join(save_dir, f'{model_name}_learning_curves.png'), dpi=300)
     plt.close()
-    print("Learning curves saved to visualizations/learning_curves.png")
+    print(f"Learning curves saved to {save_dir}/{model_name}_learning_curves.png")
 
-def plot_confusion_matrix(labels, predictions, threshold=0.5):
+def plot_confusion_matrix(labels, predictions, threshold, save_dir, model_name):
     """Plot confusion matrix"""
     pred_classes = pred_to_classes(labels, predictions, threshold)
     cm = confusion_matrix(labels, pred_classes)
@@ -214,13 +216,13 @@ def plot_confusion_matrix(labels, predictions, threshold=0.5):
                 yticklabels=['Negative', 'Positive'])
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
-    plt.title('Confusion Matrix')
+    plt.title(f'{model_name} - Confusion Matrix')
     plt.tight_layout()
-    plt.savefig('visualizations/confusion_matrix.png')
+    plt.savefig(os.path.join(save_dir, f'{model_name}_confusion_matrix.png'), dpi=300)
     plt.close()
-    print("Confusion matrix saved to visualizations/confusion_matrix.png")
+    print(f"Confusion matrix saved to {save_dir}/{model_name}_confusion_matrix.png")
 
-def plot_roc_curve(labels, predictions):
+def plot_roc_curve(labels, predictions, save_dir, model_name):
     """Plot ROC curve with AUC score"""
     fpr, tpr, thresholds = roc_curve(labels, predictions)
     auc_score = auroc(labels, predictions)
@@ -232,93 +234,82 @@ def plot_roc_curve(labels, predictions):
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.title(f'{model_name} - ROC Curve')
     plt.legend(loc="lower right")
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
-    plt.savefig('visualizations/roc_curve.png')
+    plt.savefig(os.path.join(save_dir, f'{model_name}_roc_curve.png'), dpi=300)
     plt.close()
-    print("ROC curve saved to visualizations/roc_curve.png")
+    print(f"ROC curve saved to {save_dir}/{model_name}_roc_curve.png")
 
-def plot_pr_curve(labels, predictions):
-    """Plot Precision-Recall curve with AUPRC score"""
-    precision, recall, thresholds = precision_recall_curve(labels, predictions)
-    auprc_score = auprc(labels, predictions)
+def plot_performance_summary(metrics, save_dir, model_name):
+    """Plot performance metrics in a bar chart"""
+    plt.figure(figsize=(10, 6))
     
-    plt.figure(figsize=(8, 6))
-    plt.plot(recall, precision, lw=2, label=f'PR curve (AUPRC = {auprc_score:.3f})')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-    plt.legend(loc="lower left")
-    plt.grid(True, linestyle='--', alpha=0.6)
+    metric_names = ['AUC', 'Accuracy', 'F1 Score', 'Precision', 'Recall', 'Specificity']
+    metric_values = [
+        metrics.get('auroc', 0),
+        metrics.get('val_acc', 0) / 100 if metrics.get('val_acc', 0) > 1 else metrics.get('val_acc', 0),
+        metrics.get('f1_score', 0),
+        metrics.get('precision', 0),
+        metrics.get('recall', 0),
+        metrics.get('specificity', 0)
+    ]
+    
+    bars = plt.bar(metric_names, metric_values, color='steelblue', width=0.6)
+    
+    # Add value labels on top of the bars
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                 f'{height:.3f}', ha='center', va='bottom', fontsize=12)
+    
+    plt.ylim(0, 1.1)  # Metrics are between 0 and 1
+    plt.ylabel('Score')
+    plt.title(f'{model_name} - Performance Summary')
+    plt.grid(True, linestyle='--', alpha=0.7, axis='y')
     plt.tight_layout()
-    plt.savefig('visualizations/pr_curve.png')
+    plt.savefig(os.path.join(save_dir, f'{model_name}_performance_summary.png'), dpi=300)
     plt.close()
-    print("PR curve saved to visualizations/pr_curve.png")
+    print(f"Performance summary saved to {save_dir}/{model_name}_performance_summary.png")
 
-def plot_metrics_at_thresholds(labels, predictions):
-    """Plot various metrics across different thresholds"""
-    thresholds = np.arange(0.1, 1.0, 0.1)
-    accuracies = []
-    precisions = []
-    recalls = []
-    specificities = []
-    f1_scores = []
-    mccs = []
-    
-    for threshold in thresholds:
-        accuracies.append(get_accuracy(labels, predictions, threshold))
-        precisions.append(precision(labels, predictions, threshold))
-        recalls.append(sensitivity(labels, predictions, threshold))
-        specificities.append(specificity(labels, predictions, threshold))
-        f1_scores.append(f_score(labels, predictions, threshold))
-        mccs.append(mcc(labels, predictions, threshold))
-    
-    plt.figure(figsize=(10, 8))
-    plt.plot(thresholds, accuracies, '-o', label='Accuracy')
-    plt.plot(thresholds, precisions, '-o', label='Precision')
-    plt.plot(thresholds, recalls, '-o', label='Recall/Sensitivity')
-    plt.plot(thresholds, specificities, '-o', label='Specificity')
-    plt.plot(thresholds, f1_scores, '-o', label='F1 Score')
-    plt.plot(thresholds, mccs, '-o', label='MCC')
-    plt.xlabel('Threshold')
-    plt.ylabel('Value')
-    plt.title('Metrics at Different Thresholds')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
-    plt.savefig('visualizations/metrics_vs_thresholds.png')
-    plt.close()
-    print("Threshold metrics plot saved to visualizations/metrics_vs_thresholds.png")
-
-def generate_results_summary(best_epoch_metrics):
-    """Generate textual summary of best model results"""
-    with open('visualizations/results_summary.txt', 'w') as f:
-        f.write("MODEL EVALUATION RESULTS SUMMARY\n")
+def generate_results_summary(metrics, experiment_settings, save_dir, model_name):
+    """Generate textual summary of model results with experiment settings"""
+    with open(os.path.join(save_dir, f'{model_name}_results_summary.txt'), 'w') as f:
+        f.write(f"MODEL EVALUATION RESULTS: {model_name.upper()}\n")
         f.write("===============================\n\n")
         
-        f.write(f"Best model saved at epoch: {best_epoch_metrics['epoch']}\n")
-        f.write(f"Validation Loss (MSE): {best_epoch_metrics['val_loss']:.4f}\n")
-        f.write(f"Validation Accuracy: {best_epoch_metrics['val_acc']:.2f}%\n")
-        f.write(f"AUROC: {best_epoch_metrics['auroc']:.4f}\n")
-        f.write(f"AUPRC: {best_epoch_metrics['auprc']:.4f}\n\n")
+        # Write experiment settings
+        f.write("EXPERIMENT SETTINGS:\n")
+        f.write("-------------------\n")
+        for key, value in experiment_settings.items():
+            if isinstance(value, dict):
+                f.write(f"{key}:\n")
+                for k, v in value.items():
+                    f.write(f"  {k}: {v}\n")
+            else:
+                f.write(f"{key}: {value}\n")
+        f.write("\n")
         
-        f.write("Metrics at threshold 0.5:\n")
-        f.write(f"  Precision: {best_epoch_metrics['precision']:.4f}\n")
-        f.write(f"  Recall/Sensitivity: {best_epoch_metrics['recall']:.4f}\n")
-        f.write(f"  Specificity: {best_epoch_metrics['specificity']:.4f}\n")
-        f.write(f"  F1 Score: {best_epoch_metrics['f1_score']:.4f}\n")
-        f.write(f"  MCC: {best_epoch_metrics['mcc']:.4f}\n\n")
+        # Write model metrics
+        f.write("MODEL PERFORMANCE:\n")
+        f.write("----------------\n")
+        f.write(f"Best model saved at epoch: {metrics['epoch']}\n")
+        f.write(f"Validation Loss (MSE): {metrics['val_loss']:.4f}\n")
+        f.write(f"Validation Accuracy: {metrics['val_acc']:.2f}%\n")
+        f.write(f"AUROC: {metrics['auroc']:.4f}\n")
+        f.write(f"Precision: {metrics['precision']:.4f}\n")
+        f.write(f"Recall/Sensitivity: {metrics['recall']:.4f}\n")
+        f.write(f"Specificity: {metrics['specificity']:.4f}\n")
+        f.write(f"F1 Score: {metrics['f1_score']:.4f}\n")
+        f.write(f"MCC: {metrics['mcc']:.4f}\n\n")
         
         f.write("Training completed with early stopping: ")
-        f.write("Yes\n" if best_epoch_metrics['early_stopped'] else "No\n")
+        f.write("Yes\n" if metrics['early_stopped'] else "No\n")
     
-    print("Results summary saved to visualizations/results_summary.txt")
+    print(f"Results summary saved to {save_dir}/{model_name}_results_summary.txt")
 
-# Main training loop with visualizations
+# Main training function with improved model-specific naming and visualizations
 def train_and_visualize(args):
     # Set random seed for reproducibility
     if args.seed:
@@ -331,10 +322,10 @@ def train_and_visualize(args):
     # Create save directory if it doesn't exist
     os.makedirs(args.save_dir, exist_ok=True)
     
-    # Model setup based
+    # Model setup based on argument
     if args.model == 'GCNN':
         model = GCNN()
-        model_name = 'GCN'
+        model_name = 'GCNN'
     elif args.model == 'AttGNN':
         model = AttGNN()
         model_name = 'AttGNN'
@@ -344,7 +335,7 @@ def train_and_visualize(args):
     model.to(device)
     
     # Verify model is on correct device
-    print(f"Model type: {args.model}")
+    print(f"Model type: {model_name}")
     print(f"Model is on device: {next(model.parameters()).device}")
     
     # Hyperparameters
@@ -424,22 +415,21 @@ def train_and_visualize(args):
         
         # Calculate additional metrics
         auc_score = auroc(val_labels, val_preds)
-        auprc_score = auprc(val_labels, val_preds)
         prec = precision(val_labels, val_preds, 0.5)
         rec = sensitivity(val_labels, val_preds, 0.5)
         spec = specificity(val_labels, val_preds, 0.5)
         f1 = f_score(val_labels, val_preds, 0.5)
         mcc_score = mcc(val_labels, val_preds, 0.5)
         
-        print(f"Validation - loss: {val_loss:.4f}, accuracy: {val_acc:.2f}%, AUROC: {auc_score:.4f}, AUPRC: {auprc_score:.4f}")
+        print(f"Validation - loss: {val_loss:.4f}, accuracy: {val_acc:.2f}%, AUROC: {auc_score:.4f}")
         print(f"Precision: {prec:.4f}, Recall: {rec:.4f}, F1-Score: {f1:.4f}, MCC: {mcc_score:.4f}")
         
         # Check for improvement in validation accuracy
         if val_acc > best_val_accuracy:
             best_val_accuracy = val_acc
             best_epoch = epoch
-            # Save model
-            model_path = os.path.join(args.save_dir, f"{model_name}.pth")
+            # Save model with specific name
+            model_path = os.path.join(args.save_dir, f"{model_name}_best_model.pt")
             torch.save(model.state_dict(), model_path)
             print(f"Model saved to {model_path} (best accuracy: {best_val_accuracy:.2f}%)")
             
@@ -449,7 +439,6 @@ def train_and_visualize(args):
                 'val_loss': val_loss,
                 'val_acc': val_acc,
                 'auroc': auc_score,
-                'auprc': auprc_score,
                 'precision': prec,
                 'recall': rec,
                 'specificity': spec,
@@ -474,35 +463,56 @@ def train_and_visualize(args):
             early_stop = True
             break
         
-        # Plot intermediate results every 5 epochs
-        if epoch % 5 == 0:
-            plot_learning_curves(train_losses, val_losses, train_accs, val_accs)
+        # Plot intermediate learning curves every 10 epochs with model name
+        if epoch % 10 == 0 or epoch == num_epochs:
+            plot_learning_curves(train_losses, val_losses, train_accs, val_accs, 
+                               args.save_dir, model_name)
             
         # Clear GPU cache after each epoch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     
-    # Plot final learning curves
-    plot_learning_curves(train_losses, val_losses, train_accs, val_accs)
-    
     # Generate final visualizations using best model metrics
     val_labels = best_epoch_metrics['val_labels']
     val_preds = best_epoch_metrics['val_preds']
     
-    plot_confusion_matrix(val_labels, val_preds)
-    plot_roc_curve(val_labels, val_preds)
-    plot_pr_curve(val_labels, val_preds)
-    plot_metrics_at_thresholds(val_labels, val_preds)
+    # Plot final learning curves with model name
+    plot_learning_curves(train_losses, val_losses, train_accs, val_accs, 
+                       args.save_dir, model_name)
     
-    # Generate results summary
-    generate_results_summary(best_epoch_metrics)
+    # Plot confusion matrix with model name
+    plot_confusion_matrix(val_labels, val_preds, 0.5, args.save_dir, model_name)
+    
+    # Plot ROC curve with model name
+    plot_roc_curve(val_labels, val_preds, args.save_dir, model_name)
+    
+    # Plot performance summary with model name
+    plot_performance_summary(best_epoch_metrics, args.save_dir, model_name)
+    
+    # Collect experiment information - without environment details
+    experiment_settings = {
+        'model': model_name,
+        'epochs': args.epochs,
+        'actual_epochs': epoch,  # How many epochs were actually run
+        'learning_rate': args.lr,
+        'optimizer': args.optimizer,
+        'scheduler': args.scheduler,
+        'early_stop': args.early_stop,
+        'batch_size': args.batch_size,
+        'device': device.type,
+        'gpu_info': get_gpu_info() if torch.cuda.is_available() else "CPU only",
+        'date_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    # Generate results summary with experiment settings
+    generate_results_summary(best_epoch_metrics, experiment_settings, args.save_dir, model_name)
     
     print(f"\n{'='*60}")
-    print(f"Training completed!")
-    print(f"Best model at epoch {best_epoch}/{num_epochs}")
+    print(f"Training completed for {model_name}!")
+    print(f"Best model at epoch {best_epoch}/{epoch}")
     print(f"Best validation accuracy: {best_val_accuracy:.2f}%")
     print(f"Minimum validation loss: {min_val_loss:.4f}")
-    print(f"All visualizations saved in the 'visualizations' directory")
+    print(f"All visualizations saved in {args.save_dir} directory")
     
     # Final GPU status
     if torch.cuda.is_available():
@@ -510,12 +520,46 @@ def train_and_visualize(args):
         
     print(f"{'='*60}")
     
-    return model, best_epoch_metrics
+    return model, best_epoch_metrics, experiment_settings
+
+def get_gpu_info():
+    """Get detailed GPU information"""
+    if not torch.cuda.is_available():
+        return "No GPU available"
+    
+    info = {}
+    for i in range(torch.cuda.device_count()):
+        props = torch.cuda.get_device_properties(i)
+        info[f'gpu_{i}'] = {
+            'name': torch.cuda.get_device_name(i),
+            'compute_capability': f"{props.major}.{props.minor}",
+            'total_memory': f"{props.total_memory / (1024**3):.2f} GB",
+            'multi_processor_count': props.multi_processor_count
+        }
+    return info
+
+def main():
+    # Parse arguments
+    args = parse_arguments()
+    
+    # Set up logging
+    log_dir = os.path.join(args.save_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Train the model and get metrics
+    model, best_metrics, experiment_settings = train_and_visualize(args)
+    
+    # Save the model with its specific name and full configuration
+    model_save_path = os.path.join(args.save_dir, f'{args.model}_best_model.pt')
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'best_metrics': best_metrics,
+        'experiment_settings': experiment_settings
+    }, model_save_path)
+    
+    # Save experiment settings separately as JSON for easier access
+    with open(os.path.join(args.save_dir, f'{args.model}_experiment_settings.json'), 'w') as f:
+        json.dump(experiment_settings, f, indent=4)
 
 if __name__ == "__main__":
-    args = parse_arguments()
-    print("Training with the following configuration:")
-    for arg in vars(args):
-        print(f"  {arg}: {getattr(args, arg)}")
-    
-    model, best_metrics = train_and_visualize(args)
+    main()

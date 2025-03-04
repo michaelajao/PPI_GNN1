@@ -5,6 +5,7 @@ This repository contains the implementation of a Graph Neural Network (GNN) appr
 ## Overview
 
 PPI_GNN uses graph-based deep learning to model proteins as graphs and predict their interactions. The model leverages:
+
 - Graph Convolutional Networks (GCNs) and Graph Attention Networks (GATs)
 - Protein sequence embeddings from SeqVec
 - Structural information encoded as node features and graph topology
