@@ -1,0 +1,17 @@
+MODEL EVALUATION RESULTS SUMMARY
+===============================
+
+Best model saved at epoch: 5
+Validation Loss (MSE): 0.0277
+Validation Accuracy: 97.10%
+AUROC: 0.9769
+AUPRC: 0.9855
+
+Metrics at threshold 0.5:
+  Precision: 0.9795
+  Recall/Sensitivity: 0.9810
+  Specificity: 0.9432
+  F1 Score: 0.9803
+  MCC: 0.9254
+
+Training completed with early stopping: Yes
