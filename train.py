@@ -30,8 +30,8 @@ from torch_geometric.data import DataLoader as DataLoader_n
 # Set device with more explicit GPU configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
-    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    # print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    # print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
     # Set GPU to use CuDNN for better performance if available
     torch.backends.cudnn.benchmark = True
     # For reproducibility with deterministic algorithms
@@ -43,10 +43,10 @@ else:
 # GPU memory tracking function
 def print_gpu_memory_usage():
     if torch.cuda.is_available():
-        print(f"GPU Memory Usage:")
-        print(f"  Allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
-        print(f"  Reserved:  {torch.cuda.memory_reserved() / 1e9:.2f} GB")
-        print(f"  Max Allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
+        # print(f"GPU Memory Usage:")
+        # print(f"  Allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+        # print(f"  Reserved:  {torch.cuda.memory_reserved() / 1e9:.2f} GB")
+        # print(f"  Max Allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
 
 # Create directory for visualizations
 os.makedirs("visualizations", exist_ok=True)
