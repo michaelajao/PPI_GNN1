@@ -1,0 +1,32 @@
+MODEL EVALUATION RESULTS: ATTGNN
+===============================
+
+EXPERIMENT SETTINGS:
+-------------------
+model: AttGNN
+epochs: 100
+actual_epochs: 25
+learning_rate: 0.0005
+optimizer: radam
+scheduler: plateau
+early_stop: 10
+batch_size: 32
+device: cuda
+gpu_info:
+  gpu_0: {'name': 'Quadro RTX 8000', 'compute_capability': '7.5', 'total_memory': '47.45 GB', 'multi_processor_count': 72}
+  gpu_1: {'name': 'Quadro RTX 8000', 'compute_capability': '7.5', 'total_memory': '47.45 GB', 'multi_processor_count': 72}
+date_time: 2025-03-04 02:07:31
+
+MODEL PERFORMANCE:
+----------------
+Best model saved at epoch: 15
+Validation Loss (MSE): 0.0148
+Validation Accuracy: 98.38%
+AUROC: 0.9836
+Precision: 0.9860
+Recall/Sensitivity: 0.9920
+Specificity: 0.9610
+F1 Score: 0.9890
+MCC: 0.9583
+
+Training completed with early stopping: Yes
