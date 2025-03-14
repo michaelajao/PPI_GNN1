@@ -5,35 +5,24 @@ import os
 import glob
 from tqdm import tqdm
 import pathlib
-
 import biographs as bg
 from Bio import SeqIO
 from Bio.PDB.PDBParser import PDBParser
-
-
 import torch
 import networkx as nx
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
-
+import pickle
+import argparse
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
-from Bio import SeqIO
-from Bio.PDB.PDBParser import PDBParser
-
-
-# ftrs = np.load("human_features/pdb_to_seqvec_dict.npy", allow_pickle=True)
-
-
 # list of 20 proteins
 pro_res_table = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
-
 # Dictionary for getting Residue symbols
 ressymbl = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU':'E', 'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L', 'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN':'Q', 'ARG':'R', 'SER': 'S','THR': 'T', 'VAL': 'V', 'TRP':'W', 'TYR': 'Y'}
-
 # residue features stored as key-value pair
 pcp_dict = {'A':[ 0.62014, -0.18875, -1.2387, -0.083627, -1.3296, -1.3817, -0.44118],
             'C':[0.29007, -0.44041,-0.76847, -1.05, -0.4893, -0.77494, -1.1148],
@@ -56,11 +45,7 @@ pcp_dict = {'A':[ 0.62014, -0.18875, -1.2387, -0.083627, -1.3296, -1.3817, -0.44
             'W':[0.81018, -1.6484, 2.0062, -1.0872, 2.3901, 1.8299, 0.032377],
             'Y':[0.26006, -1.0947, 1.2307, -0.78981, 1.2527, 1.1906, -0.18876]}
 
-from torch_geometric.data import Dataset, Dataset, download_url, Data,  Batch
-
-
-#def check_symmetric(a, rtol=1e-05, atol=1e-08):
-#    print(np.allclose(a, a.T, rtol=rtol, atol=atol))
+from torch_geometric.data import Dataset, Dataset, download_url, Data, Batch
 
 class ProteinDataset(Dataset):
     def __init__(self, root, transform=None, pre_transform=None):
@@ -74,7 +59,7 @@ class ProteinDataset(Dataset):
     @property
     def raw_file_names(self):
         
-        return [filename for filename in os.scandir(self.root+"/raw")]
+        return [filename for filename in os.scandir(self.root+"/processed")]
 
     @property
     def processed_file_names(self):
@@ -229,5 +214,115 @@ class ProteinDataset(Dataset):
         res_ftrs_out = res_ftrs(sequence)
         return torch.tensor(np.hstack((one_hot_symb, res_ftrs_out)), dtype = torch.float)
           
+
+# Function to process embeddings from pickle file
+def process_embeddings(input_file, output_file):
+    """Process protein embeddings from pickle file and convert to protein graphs."""
+    print(f"Loading embeddings from {input_file}")
+    
+    try:
+        # Create output directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         
-prot_graphs = ProteinDataset("human_features/")
+        # Load embeddings
+        with open(input_file, 'rb') as f:
+            embeddings = pickle.load(f)
+        
+        print(f"Loaded embeddings for {len(embeddings)} proteins")
+        print(f"Sample embedding structure: {type(embeddings[next(iter(embeddings))])}")
+        
+        # Convert embeddings to protein graphs
+        protein_graphs = {}
+        for protein_id, embedding_data in tqdm(embeddings.items(), desc="Converting embeddings to graphs"):
+            try:
+                # Check if embedding is a dictionary or a numpy array/list directly
+                if isinstance(embedding_data, dict):
+                    # If it's a dictionary, let's see what's inside
+                    print(f"Embedding for {protein_id} is a dict with keys: {list(embedding_data.keys())}")
+                    
+                    # Try to find the actual embedding data - common keys might be 'embedding', 'features', 'vector', etc.
+                    if 'embedding' in embedding_data:
+                        embedding_vector = embedding_data['embedding']
+                    elif 'features' in embedding_data:
+                        embedding_vector = embedding_data['features']
+                    elif 'vector' in embedding_data:
+                        embedding_vector = embedding_data['vector']
+                    elif 'data' in embedding_data:
+                        embedding_vector = embedding_data['data']
+                    else:
+                        # If we can't find the embedding in common keys, try the first value in the dict
+                        first_key = next(iter(embedding_data))
+                        embedding_vector = embedding_data[first_key]
+                        print(f"Using {first_key} as the embedding key for {protein_id}")
+                else:
+                    # If it's already a vector/array, use it directly
+                    embedding_vector = embedding_data
+                
+                # Convert the embedding to a tensor
+                if isinstance(embedding_vector, (list, np.ndarray)):
+                    node_features = torch.tensor(embedding_vector, dtype=torch.float)
+                else:
+                    raise ValueError(f"Unsupported embedding format: {type(embedding_vector)}")
+                
+                # For sequence embeddings, the shape should be [seq_length, feature_dim]
+                # If it's not in this format, we need to reshape it
+                if len(node_features.shape) == 1:
+                    # If it's a 1D vector, reshape to [1, feature_dim]
+                    node_features = node_features.unsqueeze(0)
+                
+                # Create a simple fully connected graph structure
+                # You can modify this to use a more sophisticated approach
+                num_nodes = node_features.shape[0]
+                print(f"Creating graph for {protein_id} with {num_nodes} nodes")
+                
+                # If there's only one node, create a self-loop
+                if num_nodes == 1:
+                    edge_index = torch.tensor([[0], [0]], dtype=torch.long)
+                else:
+                    edges = []
+                    for i in range(num_nodes):
+                        for j in range(i+1, num_nodes):
+                            edges.append([i, j])
+                            edges.append([j, i])  # Add both directions for undirected graph
+                    
+                    edge_index = torch.tensor(edges, dtype=torch.long).t()
+                
+                # Create PyG Data object
+                data = Data(x=node_features, edge_index=edge_index)
+                protein_graphs[protein_id] = data
+                
+            except Exception as e:
+                print(f"Error processing protein {protein_id}: {e}")
+                continue
+        
+        # Save to output file
+        with open(output_file, 'wb') as f:
+            pickle.dump(protein_graphs, f)
+        
+        print(f"Successfully saved {len(protein_graphs)} protein graphs to {output_file}")
+        return True
+    except Exception as e:
+        print(f"Error processing embeddings: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Convert protein data to graph representations.')
+    parser.add_argument('--input', type=str, required=True,
+                        help='Path to input file containing protein embeddings in pickle format')
+    parser.add_argument('--output', type=str, required=True,
+                        help='Path to output file to save protein graphs in pickle format')
+    parser.add_argument('--legacy', action='store_true',
+                        help='Use legacy mode with PDB files from human_features directory')
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
+    
+    if args.legacy:
+        # Original behavior
+        prot_graphs = ProteinDataset("human_features/")
+    else:
+        # New behavior with embeddings
+        process_embeddings(args.input, args.output)

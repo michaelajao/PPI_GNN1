@@ -1,2 +1,6 @@
 human_features/processed/*.pt
 Miniconda3-py39_4.12.0-Linux-x86_64.sh
+my_env_dataset/processed/*
+my_new_dataset/processed/*.pkl
+my_new_dataset/processed/*.pkl
+my_new_dataset/processed/*.pt

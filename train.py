@@ -22,43 +22,57 @@ import networkx as nx
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
-from data_prepare import dataset, trainloader, testloader
 from models import GCNN, AttGNN
 from torch_geometric.data import DataLoader as DataLoader_n
 
+import torch
+from torch.utils.data import Dataset
+from torch_geometric.data import Batch
+import numpy as np
+
+def print_gpu_memory_usage():
+    """Print current GPU memory usage"""
+    if torch.cuda.is_available():
+        print("\nGPU Memory Usage:")
+        for i in range(torch.cuda.device_count()):
+            allocated = torch.cuda.memory_allocated(i) / 1024**3
+            cached = torch.cuda.memory_reserved(i) / 1024**3
+            print(f"GPU {i}: Allocated = {allocated:.2f}GB, Cached = {cached:.2f}GB")
+    return
+
+class CovidPPIDataset(Dataset):
+    def __init__(self, data_dict):
+        """
+        Initialize dataset from saved dictionary
+        Args:
+            data_dict: Dictionary containing dataset info
+        """
+        self.train_indices = data_dict['train_indices']
+        self.test_indices = data_dict['test_indices']
+        self.dataset = data_dict['dataset']
+        
+    def __len__(self):
+        return len(self.dataset)
+        
+    def __getitem__(self, idx):
+        return self.dataset[idx]
 
 # Set device with more explicit GPU configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
-    # print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-    # print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
     # Set GPU to use CuDNN for better performance if available
     torch.backends.cudnn.benchmark = True
     # For reproducibility with deterministic algorithms
-    # torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.deterministic = True
 else:
     print("CUDA is not available. Using CPU instead.")
-    
-
-# GPU memory tracking function
-def print_gpu_memory_usage():
-    if torch.cuda.is_available():
-        # print(f"GPU Memory Usage:")
-        # print(f"  Allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
-        # print(f"  Reserved:  {torch.cuda.memory_reserved() / 1e9:.2f} GB")
-        # print(f"  Max Allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
 
 # Create directory for visualizations
 os.makedirs("visualizations", exist_ok=True)
 
-# Print dataset information
-print("Dataset Information:")
-print(f"Total samples: {len(dataset)}")
-print(f"Training batches: {len(trainloader)}")
-print(f"Testing batches: {len(testloader)}")
-
-total_samples = len(dataset)
-n_iterations = math.ceil(total_samples/5)
+n_iterations = math.ceil(22217/5)  # Using a fixed value since this isn't critical
 
 # Add argument parser function
 def parse_arguments():
@@ -67,6 +81,10 @@ def parse_arguments():
     # Model selection
     parser.add_argument('--model', type=str, default='GCNN', choices=['GCNN', 'AttGNN'],
                         help='Model architecture to train (GCNN, AttGNN)')
+    
+    # Data path
+    parser.add_argument('--data_path', type=str, required=True,
+                        help='Path to the data file containing the processed dataset')
     
     # Training parameters
     parser.add_argument('--epochs', type=int, default=50,
@@ -310,7 +328,7 @@ def generate_results_summary(metrics, experiment_settings, save_dir, model_name)
     print(f"Results summary saved to {save_dir}/{model_name}_results_summary.txt")
 
 # Main training function with improved model-specific naming and visualizations
-def train_and_visualize(args):
+def train_and_visualize(args, trainloader=None, testloader=None):
     # Set random seed for reproducibility
     if args.seed:
         torch.manual_seed(args.seed)
@@ -533,10 +551,56 @@ def get_gpu_info():
         info[f'gpu_{i}'] = {
             'name': torch.cuda.get_device_name(i),
             'compute_capability': f"{props.major}.{props.minor}",
-            'total_memory': f"{props.total_memory / (1024**3):.2f} GB",
+            'total_memory': f"{props.total_memory / (1024**3)::.2f} GB",
             'multi_processor_count': props.multi_processor_count
         }
     return info
+
+def load_data(data_path):
+    """Load dataset from the given path"""
+    print(f"Loading data from {data_path}")
+    try:
+        data_dict = torch.load(data_path)
+        dataset = CovidPPIDataset(data_dict)
+        
+        # Create train/test splits using saved indices
+        train_dataset = torch.utils.data.Subset(dataset, data_dict['train_indices'])
+        test_dataset = torch.utils.data.Subset(dataset, data_dict['test_indices'])
+        
+        # Create data loaders
+        trainloader = DataLoader(train_dataset, batch_size=32, shuffle=True,
+                               collate_fn=collate_batch)
+        testloader = DataLoader(test_dataset, batch_size=32, shuffle=False,
+                              collate_fn=collate_batch)
+        
+        print(f"Train samples: {len(train_dataset)}")
+        print(f"Test samples: {len(test_dataset)}")
+        
+        return trainloader, testloader, dataset
+        
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        raise
+
+def collate_batch(batch):
+    """
+    Custom collate function for batching protein pairs
+    """
+    prot1_list = []
+    prot2_list = []
+    labels = []
+    
+    for prot1, prot2, label in batch:
+        prot1_list.append(prot1)
+        prot2_list.append(prot2)
+        labels.append(label)
+    
+    # Create batches using Pytorch Geometric's Batch
+    prot1_batch = Batch.from_data_list(prot1_list)
+    prot2_batch = Batch.from_data_list(prot2_list)
+    labels = torch.stack(labels)
+    
+    return prot1_batch, prot2_batch, labels
 
 def main():
     # Parse arguments
@@ -546,10 +610,17 @@ def main():
     log_dir = os.path.join(args.save_dir, 'logs')
     os.makedirs(log_dir, exist_ok=True)
     
-    # Train the model and get metrics
-    model, best_metrics, experiment_settings = train_and_visualize(args)
+    # Load the data
+    trainloader, testloader, dataset = load_data(args.data_path)
+    print("\nDataset Information:")
+    print(f"Total samples: {len(dataset)}")
+    print(f"Training batches: {len(trainloader)}")
+    print(f"Testing batches: {len(testloader)}\n")
     
-    # Save the model with its specific name and full configuration
+    # Train the model and get metrics
+    model, best_metrics, experiment_settings = train_and_visualize(args, trainloader, testloader)
+    
+    # Save the model
     model_save_path = os.path.join(args.save_dir, f'{args.model}_best_model.pt')
     torch.save({
         'model_state_dict': model.state_dict(),
@@ -557,7 +628,7 @@ def main():
         'experiment_settings': experiment_settings
     }, model_save_path)
     
-    # Save experiment settings separately as JSON for easier access
+    # Save experiment settings
     with open(os.path.join(args.save_dir, f'{args.model}_experiment_settings.json'), 'w') as f:
         json.dump(experiment_settings, f, indent=4)
 
