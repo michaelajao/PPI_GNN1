@@ -40,13 +40,22 @@ else:
     print("CUDA is not available. Using CPU instead.")
     
 
-# # GPU memory tracking function
-# def print_gpu_memory_usage():
-#     if torch.cuda.is_available():
-#         # print(f"GPU Memory Usage:")
-#         # print(f"  Allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
-#         # print(f"  Reserved:  {torch.cuda.memory_reserved() / 1e9:.2f} GB")
-#         # print(f"  Max Allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
+# GPU memory tracking function
+def get_gpu_info():
+    """Get detailed GPU information"""
+    if not torch.cuda.is_available():
+        return "No GPU available"
+    
+    info = {}
+    for i in range(torch.cuda.device_count()):
+        props = torch.cuda.get_device_properties(i)
+        info[f'gpu_{i}'] = {
+            'name': torch.cuda.get_device_name(i),
+            'compute_capability': f"{props.major}.{props.minor}",
+            'total_memory': f"{props.total_memory / (1024**3):.2f} GB",
+            'multi_processor_count': props.multi_processor_count
+        }
+    return info
 
 # Create directory for visualizations
 os.makedirs("visualizations", exist_ok=True)
@@ -148,10 +157,6 @@ def train(model, device, trainloader, optimizer, epoch, scheduler=None):
     loss_tr = total_loss / batch_count
     
     print(f'Epoch {epoch} - train_loss: {loss_tr:.4f} - train_accuracy: {acc_tr:.2f}%')
-    
-    # # Optional: Print GPU memory usage
-    # if torch.cuda.is_available():
-    #     print_gpu_memory_usage()
     
     return loss_tr, acc_tr, labels_tr_np, predictions_tr_np
 
@@ -338,6 +343,67 @@ def train_and_visualize(args):
     print(f"Model type: {model_name}")
     print(f"Model is on device: {next(model.parameters()).device}")
     
+    # Check if epochs is 0 or negative, handle gracefully
+    if args.epochs <= 0:
+        print(f"Warning: Number of epochs set to {args.epochs}, which is invalid.")
+        print("Running initial evaluation but skipping training.")
+        # Evaluate model without training
+        val_labels, val_preds = predict(model, device, testloader)
+        val_loss = get_mse(val_labels, val_preds)
+        val_acc = get_accuracy(val_labels, val_preds, 0.5)
+        auc_score = auroc(val_labels, val_preds)
+        prec = precision(val_labels, val_preds, 0.5)
+        rec = sensitivity(val_labels, val_preds, 0.5)
+        spec = specificity(val_labels, val_preds, 0.5)
+        f1 = f_score(val_labels, val_preds, 0.5)
+        mcc_score = mcc(val_labels, val_preds, 0.5)
+        
+        # Initialize best_epoch_metrics with current evaluation
+        best_epoch_metrics = {
+            'epoch': 0,
+            'val_loss': val_loss,
+            'val_acc': val_acc,
+            'auroc': auc_score,
+            'precision': prec,
+            'recall': rec,
+            'specificity': spec,
+            'f1_score': f1,
+            'mcc': mcc_score,
+            'val_labels': val_labels,
+            'val_preds': val_preds,
+            'early_stopped': False
+        }
+        
+        # Save untrained model
+        model_path = os.path.join(args.save_dir, f"{model_name}_initial_model.pt")
+        torch.save(model.state_dict(), model_path)
+        print(f"Untrained model saved to {model_path}")
+        
+        # Create empty lists for plotting
+        train_losses = []
+        val_losses = [val_loss]
+        train_accs = []
+        val_accs = [val_acc]
+        
+        experiment_settings = {
+            'model': model_name,
+            'epochs': args.epochs,
+            'actual_epochs': 0,
+            'learning_rate': args.lr,
+            'optimizer': args.optimizer,
+            'scheduler': args.scheduler,
+            'early_stop': args.early_stop,
+            'batch_size': args.batch_size,
+            'device': device.type,
+            'gpu_info': get_gpu_info() if torch.cuda.is_available() else "CPU only",
+            'date_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        # Generate results summary
+        generate_results_summary(best_epoch_metrics, experiment_settings, args.save_dir, model_name)
+        
+        return model, best_epoch_metrics, experiment_settings
+    
     # Hyperparameters
     num_epochs = args.epochs
     learning_rate = args.lr
@@ -469,6 +535,35 @@ def train_and_visualize(args):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     
+    # Make sure best_epoch_metrics is initialized even if no training happened
+    if not best_epoch_metrics:
+        print("Warning: No training occurred or no improvement was found.")
+        # Initialize with the last evaluation metrics
+        val_labels, val_preds = predict(model, device, testloader)
+        val_loss = get_mse(val_labels, val_preds)
+        val_acc = get_accuracy(val_labels, val_preds, 0.5)
+        auc_score = auroc(val_labels, val_preds)
+        prec = precision(val_labels, val_preds, 0.5)
+        rec = sensitivity(val_labels, val_preds, 0.5)
+        spec = specificity(val_labels, val_preds, 0.5)
+        f1 = f_score(val_labels, val_preds, 0.5)
+        mcc_score = mcc(val_labels, val_preds, 0.5)
+        
+        best_epoch_metrics = {
+            'epoch': 0,
+            'val_loss': val_loss,
+            'val_acc': val_acc,
+            'auroc': auc_score,
+            'precision': prec,
+            'recall': rec,
+            'specificity': spec,
+            'f1_score': f1,
+            'mcc': mcc_score,
+            'val_labels': val_labels,
+            'val_preds': val_preds,
+            'early_stopped': False
+        }
+    
     # Generate final visualizations using best model metrics
     val_labels = best_epoch_metrics['val_labels']
     val_preds = best_epoch_metrics['val_preds']
@@ -490,7 +585,7 @@ def train_and_visualize(args):
     experiment_settings = {
         'model': model_name,
         'epochs': args.epochs,
-        'actual_epochs': epoch,  # How many epochs were actually run
+        'actual_epochs': epoch if 'epoch' in locals() else 0,  # How many epochs were actually run
         'learning_rate': args.lr,
         'optimizer': args.optimizer,
         'scheduler': args.scheduler,
@@ -506,34 +601,12 @@ def train_and_visualize(args):
     
     print(f"\n{'='*60}")
     print(f"Training completed for {model_name}!")
-    print(f"Best model at epoch {best_epoch}/{epoch}")
+    print(f"Best model at epoch {best_epoch}")
     print(f"Best validation accuracy: {best_val_accuracy:.2f}%")
     print(f"Minimum validation loss: {min_val_loss:.4f}")
     print(f"All visualizations saved in {args.save_dir} directory")
     
-    # Final GPU status
-    if torch.cuda.is_available():
-        print_gpu_memory_usage()
-        
-    print(f"{'='*60}")
-    
     return model, best_epoch_metrics, experiment_settings
-
-def get_gpu_info():
-    """Get detailed GPU information"""
-    if not torch.cuda.is_available():
-        return "No GPU available"
-    
-    info = {}
-    for i in range(torch.cuda.device_count()):
-        props = torch.cuda.get_device_properties(i)
-        info[f'gpu_{i}'] = {
-            'name': torch.cuda.get_device_name(i),
-            'compute_capability': f"{props.major}.{props.minor}",
-            'total_memory': f"{props.total_memory / (1024**3):.2f} GB",
-            'multi_processor_count': props.multi_processor_count
-        }
-    return info
 
 def main():
     # Parse arguments

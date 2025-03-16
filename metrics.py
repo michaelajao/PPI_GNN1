@@ -2,6 +2,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import average_precision_score
 import math 
 from math import sqrt
+import numpy as np
 
 
 def get_mse(actual, predicted):
@@ -74,7 +75,12 @@ def get_fn(actual, predicted, threshold):
     
 #precision = TP/ (TP + FP)    
 def precision(actual, predicted, threshold):
-    prec = get_tp(actual, predicted, threshold) / (get_tp(actual, predicted, threshold) + get_fp(actual, predicted, threshold))
+    tp = get_tp(actual, predicted, threshold)
+    fp = get_fp(actual, predicted, threshold)
+    denominator = tp + fp
+    if denominator == 0:  # Handle division by zero
+        return 0.0  # Return 0 if there are no predicted positives
+    prec = tp / denominator
     return prec
     
     
@@ -82,20 +88,39 @@ def precision(actual, predicted, threshold):
 #recall = TP / (TP + FN)   
 # sensitivity = recall 
 def sensitivity(actual, predicted, threshold):
-    sens = get_tp(actual, predicted, threshold)/ (get_tp(actual, predicted, threshold) + get_fn(actual, predicted, threshold))
+    tp = get_tp(actual, predicted, threshold) 
+    fn = get_fn(actual, predicted, threshold)
+    denominator = tp + fn
+    if denominator == 0:  # Handle division by zero
+        return 0.0  # Return 0 if there are no actual positives
+    sens = tp / denominator
     return sens
     
 
     
 #Specificity = TN/(TN+FP)    
-def specificity(actual, predicted, threshold):     
-   spec =  get_tn(actual, predicted, threshold)/ (get_tn(actual, predicted, threshold) + get_fp(actual, predicted, threshold))
-   return spec
+def specificity(actual, predicted, threshold):
+    tn = get_tn(actual, predicted, threshold)
+    fp = get_fp(actual, predicted, threshold)
+    denominator = tn + fp
+    if denominator == 0:  # Handle division by zero
+        return 0.0  # Return 0 if there are no actual negatives
+    spec = tn / denominator
+    return spec
 
 
 #f1 score  = 2 / ((1/ precision) + (1/recall))   
 def f_score(actual, predicted, threshold):
-    f_sc = 2 / ( (1 / precision(actual, predicted, threshold)) + (1/ sensitivity(actual, predicted, threshold)))
+    prec = precision(actual, predicted, threshold)
+    rec = sensitivity(actual, predicted, threshold)
+    
+    # Handle division by zero cases
+    if prec == 0 and rec == 0:
+        return 0.0  # If both precision and recall are 0, f1 score is 0
+    elif prec == 0 or rec == 0:
+        return 0.0  # If either precision or recall is 0, f1 score is 0
+    
+    f_sc = 2 * prec * rec / (prec + rec)
     return f_sc
 
    
@@ -105,17 +130,45 @@ def mcc(act, pred, thre):
    tn = get_tn(act, pred, thre)
    fp = get_fp(act, pred, thre)
    fn = get_fn(act, pred, thre)
-   mcc_met = (tp*tn - fp*fn) / (sqrt((tn+fn)*(fp+tp)*(tn+fp)*(fn+tp)))
+   
+   # Check for division by zero
+   denominator = sqrt((tn+fn)*(fp+tp)*(tn+fp)*(fn+tp))
+   if denominator == 0:
+       return 0.0  # Return 0 if denominator is 0
+   
+   mcc_met = (tp*tn - fp*fn) / denominator
    return mcc_met
    
    
 
 def auroc(act, pred):
+   # Check if all predictions are the same (all 0s or all 1s)
+   if len(np.unique(pred)) == 1:
+       # Can't calculate AUC with only one prediction value
+       return 0.5  # Return 0.5 as default (random classifier)
+   
+   # Check if all actual labels are the same
+   if len(np.unique(act)) == 1:
+       # Can't calculate AUC with only one class
+       return 0.5  # Return 0.5 as default (random classifier)
+   
    return roc_auc_score(act, pred)
   
 
    
 def auprc(act, pred):
-   return average_precision_score(act, pred)
- 
+   # Check if all predictions are the same
+   if len(np.unique(pred)) == 1:
+       # Can't calculate AUPRC with only one prediction value
+       return np.mean(act)  # Return prevalence as default
    
+   # Check if all actual labels are the same
+   if len(np.unique(act)) == 1:
+       # Can't calculate AUPRC with only one class
+       if np.mean(act) == 1:  # If all are positive
+           return 1.0
+       else:  # If all are negative
+           return 0.0
+   
+   return average_precision_score(act, pred)
+

@@ -1,0 +1,31 @@
+MODEL EVALUATION RESULTS: ATTGNN
+===============================
+
+EXPERIMENT SETTINGS:
+-------------------
+model: AttGNN
+epochs: 100
+actual_epochs: 23
+learning_rate: 0.0005
+optimizer: radam
+scheduler: plateau
+early_stop: 10
+batch_size: 32
+device: cuda
+gpu_info:
+  gpu_0: {'name': 'NVIDIA GeForce RTX 3060 Laptop GPU', 'compute_capability': '8.6', 'total_memory': '6.00 GB', 'multi_processor_count': 30}
+date_time: 2025-03-16 19:44:21
+
+MODEL PERFORMANCE:
+----------------
+Best model saved at epoch: 13
+Validation Loss (MSE): 0.0166
+Validation Accuracy: 98.22%
+AUROC: 0.9822
+Precision: 0.9872
+Recall/Sensitivity: 0.9887
+Specificity: 0.9644
+F1 Score: 0.9879
+MCC: 0.9543
+
+Training completed with early stopping: Yes

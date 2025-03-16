@@ -1,0 +1,31 @@
+MODEL EVALUATION RESULTS: GCNN
+===============================
+
+EXPERIMENT SETTINGS:
+-------------------
+model: GCNN
+epochs: 0
+actual_epochs: 0
+learning_rate: 0.0005
+optimizer: radam
+scheduler: plateau
+early_stop: 2
+batch_size: 32
+device: cuda
+gpu_info:
+  gpu_0: {'name': 'NVIDIA GeForce RTX 3060 Laptop GPU', 'compute_capability': '8.6', 'total_memory': '6.00 GB', 'multi_processor_count': 30}
+date_time: 2025-03-16 22:34:59
+
+MODEL PERFORMANCE:
+----------------
+Best model saved at epoch: 0
+Validation Loss (MSE): 0.2523
+Validation Accuracy: 26.53%
+AUROC: 0.3871
+Precision: 0.0000
+Recall/Sensitivity: 0.0000
+Specificity: 1.0000
+F1 Score: 0.0000
+MCC: 0.0000
+
+Training completed with early stopping: No

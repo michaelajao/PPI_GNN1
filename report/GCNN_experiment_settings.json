@@ -1,0 +1,20 @@
+{
+    "model": "GCNN",
+    "epochs": 0,
+    "actual_epochs": 0,
+    "learning_rate": 0.0005,
+    "optimizer": "radam",
+    "scheduler": "plateau",
+    "early_stop": 2,
+    "batch_size": 32,
+    "device": "cuda",
+    "gpu_info": {
+        "gpu_0": {
+            "name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+            "compute_capability": "8.6",
+            "total_memory": "6.00 GB",
+            "multi_processor_count": 30
+        }
+    },
+    "date_time": "2025-03-16 22:34:59"
+}
