@@ -40,13 +40,13 @@ else:
     print("CUDA is not available. Using CPU instead.")
     
 
-# GPU memory tracking function
-def print_gpu_memory_usage():
-    if torch.cuda.is_available():
-        # print(f"GPU Memory Usage:")
-        # print(f"  Allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
-        # print(f"  Reserved:  {torch.cuda.memory_reserved() / 1e9:.2f} GB")
-        # print(f"  Max Allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
+# # GPU memory tracking function
+# def print_gpu_memory_usage():
+#     if torch.cuda.is_available():
+#         # print(f"GPU Memory Usage:")
+#         # print(f"  Allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+#         # print(f"  Reserved:  {torch.cuda.memory_reserved() / 1e9:.2f} GB")
+#         # print(f"  Max Allocated: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
 
 # Create directory for visualizations
 os.makedirs("visualizations", exist_ok=True)
@@ -149,9 +149,9 @@ def train(model, device, trainloader, optimizer, epoch, scheduler=None):
     
     print(f'Epoch {epoch} - train_loss: {loss_tr:.4f} - train_accuracy: {acc_tr:.2f}%')
     
-    # Optional: Print GPU memory usage
-    if torch.cuda.is_available():
-        print_gpu_memory_usage()
+    # # Optional: Print GPU memory usage
+    # if torch.cuda.is_available():
+    #     print_gpu_memory_usage()
     
     return loss_tr, acc_tr, labels_tr_np, predictions_tr_np
 
@@ -384,9 +384,6 @@ def train_and_visualize(args):
     train_accs = []
     val_accs = []
     
-    # Print initial GPU status
-    if torch.cuda.is_available():
-        print_gpu_memory_usage()
     
     # Training loop
     for epoch in range(1, num_epochs + 1):

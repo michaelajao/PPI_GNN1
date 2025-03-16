@@ -56,109 +56,53 @@ pcp_dict = {'A':[ 0.62014, -0.18875, -1.2387, -0.083627, -1.3296, -1.3817, -0.44
             'W':[0.81018, -1.6484, 2.0062, -1.0872, 2.3901, 1.8299, 0.032377],
             'Y':[0.26006, -1.0947, 1.2307, -0.78981, 1.2527, 1.1906, -0.18876]}
 
-from torch_geometric.data import Dataset, Dataset, download_url, Data,  Batch
+from torch_geometric.data import Dataset, download_url, Data, Batch
 
 
 #def check_symmetric(a, rtol=1e-05, atol=1e-08):
 #    print(np.allclose(a, a.T, rtol=rtol, atol=atol))
 
-class ProteinDataset(Dataset):
-    def __init__(self, root, transform=None, pre_transform=None):
-        super(ProteinDataset, self).__init__(root, transform=None,
-                 pre_transform=None)
-        self.data = self.processed_paths
-        #self.processed_dir = "../human_features/processed/"
-        # self.data = torch.load(self.processed_paths)
-        # print("Daata si {}". format(self.data))
-
-    @property
-    def raw_file_names(self):
+class CustomProteinDataset:
+    def __init__(self, root):
+        self.root = root
+        self.data_prot = []
+        self.processed_dir = os.path.join(self.root, 'processed')
         
-        return [filename for filename in os.scandir(self.root+"/raw")]
-
-    @property
-    def processed_file_names(self):
-        return [os.path.splitext(os.path.basename(file))[0]+'.pt' for file in self.raw_paths]
-
-    def download(self):
-        # Download to `self.raw_dir`.
-        pass
-
-    def process(self):
-        # Read data into huge `Data` list.
-        self.data = self.processed_paths
+        # Check if processed directory exists
+        if not os.path.exists(self.processed_dir):
+            os.makedirs(self.processed_dir)
+            
+        # Load processed files
+        self.processed_file_paths = self._get_processed_files()
         
-        
-        data_list =[]
-        count = 0
-        for file in tqdm(self.raw_paths):
-           if(pathlib.Path(file).suffix ==".pdb"):
-          
-   
-               try:
-                struct = self._get_structure(file)
-               except:
-                print(file)
-                continue
-               seq = self._get_sequence(struct)
+        if len(self.processed_file_paths) > 0:
+            print(f"Found {len(self.processed_file_paths)} processed protein files.")
+            for file_path in tqdm(self.processed_file_paths):
+                try:
+                    data = torch.load(file_path)
+                    self.data_prot.append(data)
+                except Exception as e:
+                    print(f"Error loading {file_path}: {e}")
+        else:
+            print("No processed protein files found.")
 
-          # node features extracted
-               node_feats = self._get_one_hot_symbftrs(seq)
+    def _get_processed_files(self):
+        """Get paths of all processed .pt files"""
+        if os.path.exists(self.processed_dir):
+            processed_files = glob.glob(os.path.join(self.processed_dir, '*.pt'))
+            # Also check for nested processed directory
+            nested_processed_dir = os.path.join(self.processed_dir, 'processed')
+            if os.path.exists(nested_processed_dir):
+                processed_files.extend(glob.glob(os.path.join(nested_processed_dir, '*.pt')))
+            return processed_files
+        return []
 
-          #edge-index extracted
-          
-         
-               mat = self._get_adjacency(file)
-          
-           # if sequence size > matrix dimensions 
-               if(mat.shape[0] < torch.Tensor.size(node_feats)[0]) :
-                 #node_feats = torch.tensor(ftrs.item()[os.path.splitext(os.path.basename(file))[0]])
-                 edge_index = self._get_edgeindex(file, mat)
-           
-                 print(f'Node features size :{torch.Tensor.size(node_feats)}')
-                 print(f'mat size :{mat.shape}')
-          # create data object
-       
-                 data = Data(x = node_feats, edge_index = edge_index )
-                 count += 1
-                 data_list.append(data)
-                 torch.save(data, self.processed_dir + "/"+ os.path.splitext(os.path.basename(file))[0]+'.pt')
- 
-           
-               elif mat.shape[0] == torch.Tensor.size(node_feats)[0] : 
-                 #node_feats = torch.tensor(ftrs.item()[os.path.splitext(os.path.basename(file))[0]])
-                 edge_index = self._get_edgeindex(file, mat)
-           
-           
-                 print(f'Node features size :{torch.Tensor.size(node_feats)}')
-                 print(f'mat size :{mat.shape}')
-          
-          # create data object
-           
-          
+    def len(self):
+        return len(self.data_prot)
 
-                 data = Data(x = node_feats, edge_index = edge_index )
-                 count += 1
-
-                 data_list.append(data)
-                 torch.save(data, self.processed_dir + "/"+ os.path.splitext(os.path.basename(file))[0]+'.pt')
-          
-        self.data_prot = data_list 
-        print(count)
-
-  
-        # data, slices = self.collate(data_list)
-        # torch.save((data, slices), self.processed_paths[0])
-
-    def __len__(self):
-        return len(self.processed_file_names)
+    def get(self, idx):
+        return self.data_prot[idx]
     
-
-    # file stands for file path
-    def __getitem__(self, idx):
-     
-        return self.data_prot[idx] 
-     
     def _get_adjacency(self, file):
         edge_ind =[]
         molecule = bg.Pmolecule(file)
@@ -166,7 +110,6 @@ class ProteinDataset(Dataset):
         mat = nx.adjacency_matrix(network)
         m = mat.todense()
         return m
-
 
     # get adjacency matrix in coo format to pass in GCNN model
     def _get_edgeindex(self, file, adjacency_mat):
@@ -180,14 +123,12 @@ class ProteinDataset(Dataset):
         edge_ind.append(b)
         return torch.tensor(np.array(edge_ind), dtype= torch.long)
 
-
     # get structure from a pdb file 
     # Uses biopython
     def _get_structure(self, file):
         parser = PDBParser()
         structure = parser.get_structure(id, file)
         return structure
-
 
     # Function to get sequence from pdb structure 
     # Uses structure made using biopython
@@ -201,7 +142,6 @@ class ProteinDataset(Dataset):
                   sequence = sequence+ ressymbl[residue.get_resname()]
         return sequence
     
-
     # One hot encoding for symbols
     def _get_one_hot_symbftrs(self, sequence):
         one_hot_symb = np.zeros((len(sequence),len(pro_res_table)))
@@ -212,7 +152,6 @@ class ProteinDataset(Dataset):
           row +=1
         return torch.tensor(one_hot_symb, dtype= torch.float)   
 
-
     # Residue features calculated from pcp_dict
     def _get_res_ftrs(self, sequence):
         res_ftrs_out = []
@@ -222,12 +161,36 @@ class ProteinDataset(Dataset):
         #print(res_ftrs_out.shape)
         return torch.tensor(res_ftrs_out, dtype = torch.float)
 
-
     # total features after concatenating one_hot_symbftrs and res_ftrs
     def _get_node_ftrs(self, sequence):
-        one_hot_symb = one_hot_symbftrs(sequence)
-        res_ftrs_out = res_ftrs(sequence)
+        one_hot_symb = self._get_one_hot_symbftrs(sequence)
+        res_ftrs_out = self._get_res_ftrs(sequence)
         return torch.tensor(np.hstack((one_hot_symb, res_ftrs_out)), dtype = torch.float)
           
+# Load processed protein graphs from the processed directory
+print("Loading protein graphs...")
+prot_graphs = CustomProteinDataset("human_features/")
+print(f"Loaded {len(prot_graphs.data_prot)} protein graphs")
+
+# If command line arguments are provided for input and output files
+import argparse
+import pickle
+
+parser = argparse.ArgumentParser(description='Convert protein data to graphs')
+parser.add_argument('--input', type=str, help='Input embeddings file path')
+parser.add_argument('--output', type=str, help='Output protein graphs file path')
+args = parser.parse_args()
+
+if args.input and args.output:
+    try:
+        # Load the input embeddings
+        with open(args.input, 'rb') as f:
+            embeddings = pickle.load(f)
+        print(f"Loaded embeddings from {args.input}")
         
-prot_graphs = ProteinDataset("human_features/")
+        # Save the protein graphs
+        with open(args.output, 'wb') as f:
+            pickle.dump(prot_graphs.data_prot, f)
+        print(f"Saved protein graphs to {args.output}")
+    except Exception as e:
+        print(f"Error processing files: {e}")
