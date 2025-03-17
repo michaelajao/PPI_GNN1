@@ -1,7 +1,7 @@
 {
     "model": "GCNN",
-    "epochs": 0,
-    "actual_epochs": 0,
+    "epochs": 100,
+    "actual_epochs": 9,
     "learning_rate": 0.0005,
     "optimizer": "radam",
     "scheduler": "plateau",
@@ -16,5 +16,5 @@
             "multi_processor_count": 30
         }
     },
-    "date_time": "2025-03-16 22:34:59"
+    "date_time": "2025-03-17 04:59:41"
 }
