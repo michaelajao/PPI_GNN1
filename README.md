@@ -93,7 +93,7 @@ python train.py
 With custom parameters:
 
 ```bash
-python train.py --model AttGNN --epochs 100 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 10 --save_dir visualization
+python train.py --model AttGNN --epochs 100 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 10 --save_dir visualizations
 ```
 
 Available arguments:
