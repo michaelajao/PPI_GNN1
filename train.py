@@ -5,6 +5,7 @@ import os
 import argparse  # Add this import
 import json
 import datetime
+import csv  # Add CSV import for logging
 
 from tqdm import tqdm
 import math
@@ -314,6 +315,46 @@ def generate_results_summary(metrics, experiment_settings, save_dir, model_name)
     
     print(f"Results summary saved to {save_dir}/{model_name}_results_summary.txt")
 
+def log_epoch_metrics(epoch, train_loss, train_acc, val_loss, val_acc, auc_score, 
+                    precision_val, recall_val, f1_val, mcc_val, log_dir, model_name):
+    """
+    Log per-epoch metrics to a CSV file
+    
+    Args:
+        epoch: Current epoch number
+        metrics: Dictionary containing various metric values
+        log_dir: Directory to save log files
+        model_name: Name of the model being trained
+    """
+    log_file = os.path.join(log_dir, f'{model_name}_training_log.csv')
+    
+    # Create header if file doesn't exist
+    file_exists = os.path.isfile(log_file)
+    
+    with open(log_file, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc', 
+                           'auc', 'precision', 'recall', 'f1_score', 'mcc',
+                           'timestamp'])
+        
+        # Write current epoch metrics
+        writer.writerow([
+            epoch, 
+            f"{train_loss:.6f}", 
+            f"{train_acc:.4f}", 
+            f"{val_loss:.6f}", 
+            f"{val_acc:.4f}",
+            f"{auc_score:.4f}",
+            f"{precision_val:.4f}",
+            f"{recall_val:.4f}",
+            f"{f1_val:.4f}",
+            f"{mcc_val:.4f}",
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ])
+    
+    print(f"Epoch {epoch} metrics logged to {log_file}")
+
 # Main training function with improved model-specific naming and visualizations
 def train_and_visualize(args):
     # Set random seed for reproducibility
@@ -326,6 +367,10 @@ def train_and_visualize(args):
     
     # Create save directory if it doesn't exist
     os.makedirs(args.save_dir, exist_ok=True)
+    
+    # Create log directory
+    log_dir = os.path.join(args.save_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
     
     # Model setup based on argument
     if args.model == 'GCNN':
@@ -483,6 +528,10 @@ def train_and_visualize(args):
         spec = specificity(val_labels, val_preds, 0.5)
         f1 = f_score(val_labels, val_preds, 0.5)
         mcc_score = mcc(val_labels, val_preds, 0.5)
+        
+        # Log each epoch's metrics to CSV file
+        log_epoch_metrics(epoch, train_loss, train_acc, val_loss, val_acc,
+                         auc_score, prec, rec, f1, mcc_score, log_dir, model_name)
         
         print(f"Validation - loss: {val_loss:.4f}, accuracy: {val_acc:.2f}%, AUROC: {auc_score:.4f}")
         print(f"Precision: {prec:.4f}, Recall: {rec:.4f}, F1-Score: {f1:.4f}, MCC: {mcc_score:.4f}")

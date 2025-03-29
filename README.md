@@ -96,6 +96,12 @@ With custom parameters:
 python train.py --model AttGNN --epochs 100 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 10 --save_dir visualizations
 ```
 
+'''bash
+python train.py --model GCNN --epochs 10 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 2 --save_dir report
+'''
+
+### Command Line Arguments
+
 Available arguments:
 - `--model`: Model architecture (`GCNN` or `AttGNN`)
 - `--epochs`: Number of training epochs

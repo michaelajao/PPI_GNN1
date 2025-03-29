@@ -1,11 +1,11 @@
 {
     "model": "GCNN",
-    "epochs": 100,
-    "actual_epochs": 9,
+    "epochs": 5,
+    "actual_epochs": 5,
     "learning_rate": 0.0005,
     "optimizer": "radam",
     "scheduler": "plateau",
-    "early_stop": 2,
+    "early_stop": 1,
     "batch_size": 32,
     "device": "cuda",
     "gpu_info": {
@@ -16,5 +16,5 @@
             "multi_processor_count": 30
         }
     },
-    "date_time": "2025-03-17 04:59:41"
+    "date_time": "2025-03-29 22:57:49"
 }
