@@ -39,25 +39,53 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
     print(f"Running experiment: {experiment_name}")
     print(f"Command: {' '.join(command)}")
     
-    start_time = time.time()
-    process = subprocess.run(command, capture_output=True, text=True)
-    end_time = time.time()
+    # Create a log file for the experiment output
+    log_file_path = os.path.join(experiment_dir, f"{experiment_name}_terminal_output.txt")
     
+    start_time = time.time()
+    
+    # Run the command and capture output
+    with open(log_file_path, 'w') as log_file:
+        # Write the experiment info to the log file
+        log_file.write(f"Running experiment: {experiment_name}\n")
+        log_file.write(f"Command: {' '.join(command)}\n\n")
+        
+        # Run the process and tee output to both terminal and log file
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1  # Line buffered
+        )
+        
+        # Stream output to both terminal and log file
+        for line in process.stdout:
+            print(line, end='')  # Print to terminal
+            log_file.write(line)  # Write to log file
+        
+        # Wait for the process to complete
+        return_code = process.wait()
+    
+    end_time = time.time()
     duration = end_time - start_time
     
     # Check if the experiment was successful
-    success = process.returncode == 0
+    success = return_code == 0
     
     if not success:
         print(f"Experiment {experiment_name} failed!")
-        print(f"Error: {process.stderr}")
+        with open(log_file_path, 'r') as log_file:
+            error_output = log_file.read()
+        print(f"Error: See log file for details")
         return {
             "model": model,
             "optimizer": optimizer,
             "scheduler": scheduler,
             "learning_rate": lr,
             "success": False,
-            "duration_minutes": duration / 60
+            "duration_minutes": duration / 60,
+            "log_file_path": log_file_path
         }
     
     # Try to load experiment results
@@ -70,7 +98,8 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
         "scheduler": scheduler,
         "learning_rate": lr,
         "success": True,
-        "duration_minutes": duration / 60
+        "duration_minutes": duration / 60,
+        "log_file_path": log_file_path
     }
     
     # Load settings if available
@@ -92,6 +121,7 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
             print(f"Error parsing results for {experiment_name}: {e}")
     
     print(f"Experiment {experiment_name} completed in {duration/60:.2f} minutes")
+    print(f"Terminal output saved to {log_file_path}")
     return result_data
 
 def parse_results_summary(file_path):
