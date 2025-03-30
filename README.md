@@ -109,7 +109,7 @@ python run_experiments.py --save_dir experiment_results --epochs 50 --early_stop
 ```
 
 This will:
-- Test both GCNN and AttGNN models
+- Test both GCNN, AttGNN and ResGIN models
 - Try all optimizers (adam, sgd, adagrad, radam)
 - Try all schedulers (multistep, plateau, none)
 - Test different learning rates (0.001, 0.0005, 0.0001)
