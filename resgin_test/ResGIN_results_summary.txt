@@ -1,0 +1,29 @@
+MODEL EVALUATION RESULTS: RESGIN
+===============================
+
+EXPERIMENT SETTINGS:
+-------------------
+model: ResGIN
+epochs: 5
+actual_epochs: 5
+learning_rate: 0.0005
+optimizer: radam
+scheduler: plateau
+early_stop: 3
+batch_size: 32
+device: cuda
+date_time: 2025-03-30 02:06:28
+
+MODEL PERFORMANCE:
+----------------
+Best model saved at epoch: 5
+Validation Loss (MSE): 0.0391
+Validation Accuracy: 94.89%
+AUROC: 0.9768
+Precision: 0.9529
+Recall/Sensitivity: 0.9789
+Specificity: 0.8660
+F1 Score: 0.9657
+MCC: 0.8669
+
+Training completed with early stopping: No

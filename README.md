@@ -96,13 +96,51 @@ With custom parameters:
 python train.py --model AttGNN --epochs 100 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 10 --save_dir visualizations
 ```
 
-'''bash
+```bash
 python train.py --model GCNN --epochs 10 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 2 --save_dir report
-'''
+```
+
+### Running Model Experiments
+
+To systematically evaluate different model architectures, optimizers, and schedulers:
+
+```bash
+python run_experiments.py --save_dir experiment_results --epochs 50 --early_stop 5
+```
+
+This will:
+- Test both GCNN and AttGNN models
+- Try all optimizers (adam, sgd, adagrad, radam)
+- Try all schedulers (multistep, plateau, none)
+- Test different learning rates (0.001, 0.0005, 0.0001)
+- Run for up to 50 epochs with early stopping after 5 epochs without improvement
+- Save all results in the experiment_results directory
+
+For faster execution on systems with more memory, you can use parallel processing:
+
+```bash
+python run_experiments.py --save_dir experiment_results --epochs 50 --early_stop 5 --parallel
+```
+
+### Visualizing Experiment Results
+
+After running the experiments, generate comparative visualizations:
+
+```bash
+python visualize_results.py --results_csv experiment_results/experiment_results.csv --output_dir experiment_results/visualizations
+```
+
+This will create comprehensive visualizations including:
+- Optimizer comparisons across models
+- Scheduler performance analysis
+- Learning rate impact analysis
+- Model performance comparisons
+- Heatmaps showing best parameter combinations
+- Top performing configurations
 
 ### Command Line Arguments
 
-Available arguments:
+Available arguments for training:
 - `--model`: Model architecture (`GCNN` or `AttGNN`)
 - `--epochs`: Number of training epochs
 - `--lr`: Learning rate
