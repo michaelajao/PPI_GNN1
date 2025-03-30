@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import time
 import argparse
+from datetime import datetime
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Run multiple PPI-GNN experiments')
@@ -36,8 +37,12 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
         "--save_dir", experiment_dir
     ]
     
-    print(f"Running experiment: {experiment_name}")
+    # More visually appealing experiment header
+    print(f"\n{'='*70}")
+    print(f"EXPERIMENT: {experiment_name}")
+    print(f"{'='*70}")
     print(f"Command: {' '.join(command)}")
+    print(f"{'-'*70}")
     
     # Create a log file for the experiment output
     log_file_path = os.path.join(experiment_dir, f"{experiment_name}_terminal_output.txt")
@@ -47,7 +52,8 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
     # Run the command and capture output
     with open(log_file_path, 'w') as log_file:
         # Write the experiment info to the log file
-        log_file.write(f"Running experiment: {experiment_name}\n")
+        log_file.write(f"EXPERIMENT: {experiment_name}\n")
+        log_file.write(f"{'='*50}\n")
         log_file.write(f"Command: {' '.join(command)}\n\n")
         
         # Run the process and tee output to both terminal and log file
@@ -73,11 +79,13 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
     # Check if the experiment was successful
     success = return_code == 0
     
-    if not success:
-        print(f"Experiment {experiment_name} failed!")
-        with open(log_file_path, 'r') as log_file:
-            error_output = log_file.read()
-        print(f"Error: See log file for details")
+    # Print experiment completion status with clear formatting
+    print(f"\n{'-'*70}")
+    if success:
+        print(f"✅ Experiment {experiment_name} completed successfully in {duration/60:.2f} minutes!")
+    else:
+        print(f"❌ Experiment {experiment_name} failed after {duration/60:.2f} minutes!")
+        print(f"Error details saved to {log_file_path}")
         return {
             "model": model,
             "optimizer": optimizer,
@@ -88,7 +96,7 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
             "log_file_path": log_file_path
         }
     
-    # Try to load experiment results
+    # Load experiment results
     results_file = os.path.join(experiment_dir, f"{model}_experiment_settings.json")
     performance_file = os.path.join(experiment_dir, f"{model}_results_summary.txt")
     
@@ -117,11 +125,21 @@ def run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop
         try:
             metrics = parse_results_summary(performance_file)
             result_data.update(metrics)
+            
+            # Print key metrics in a nicely formatted way
+            print("\nPERFORMANCE SUMMARY:")
+            print(f"{'-'*30}")
+            print(f"Validation Accuracy: {metrics.get('val_acc', 'N/A'):.2f}%")
+            print(f"F1 Score:           {metrics.get('f1_score', 'N/A'):.4f}")
+            print(f"AUROC:              {metrics.get('auroc', 'N/A'):.4f}")
+            print(f"MCC:                {metrics.get('mcc', 'N/A'):.4f}")
+            if result_data.get("early_stopped", False):
+                print(f"Training completed with early stopping at epoch {result_data.get('actual_epochs', 'unknown')}")
         except Exception as e:
             print(f"Error parsing results for {experiment_name}: {e}")
     
-    print(f"Experiment {experiment_name} completed in {duration/60:.2f} minutes")
-    print(f"Terminal output saved to {log_file_path}")
+    print(f"\nResults saved to {experiment_dir}")
+    print(f"{'='*70}\n")
     return result_data
 
 def parse_results_summary(file_path):
@@ -180,7 +198,19 @@ def run_all_experiments(save_dir, epochs, early_stop, parallel=False):
                 for lr in learning_rates:
                     experiments.append((model, optimizer, scheduler, lr))
     
+    # Print experiment plan with clear header
+    print(f"\n{'*'*80}")
+    print(f"PPI-GNN EXPERIMENT RUNNER")
+    print(f"{'*'*80}")
     print(f"Total experiments to run: {len(experiments)}")
+    print(f"Save directory: {os.path.abspath(save_dir)}")
+    print(f"Epochs: {epochs} | Early stopping: {early_stop} | Parallel: {'Yes' if parallel else 'No'}")
+    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'*'*80}\n")
+    
+    # Create a counter for progress tracking
+    total_experiments = len(experiments)
+    completed_experiments = 0
     
     if parallel:
         # Use concurrent.futures for parallel execution
@@ -197,22 +227,32 @@ def run_all_experiments(save_dir, epochs, early_stop, parallel=False):
                 try:
                     result = future.result()
                     results.append(result)
+                    completed_experiments += 1
+                    print(f"Progress: {completed_experiments}/{total_experiments} experiments completed ({completed_experiments/total_experiments*100:.1f}%)")
                 except Exception as e:
-                    print(f"Experiment failed: {e}")
+                    print(f"❌ Experiment failed: {e}")
     else:
         # Run sequentially
-        for model, optimizer, scheduler, lr in experiments:
+        for idx, (model, optimizer, scheduler, lr) in enumerate(experiments):
             try:
+                print(f"\nExperiment {idx+1}/{total_experiments} ({(idx+1)/total_experiments*100:.1f}% complete)")
                 result = run_experiment(model, optimizer, scheduler, lr, save_dir, epochs, early_stop)
                 results.append(result)
+                completed_experiments += 1
             except Exception as e:
-                print(f"Experiment failed: {e}")
+                print(f"❌ Experiment failed: {e}")
     
     # Create a DataFrame from results and save to CSV
     results_df = pd.DataFrame(results)
     
     # Sort by model type and then by performance metric (f1_score)
-    results_df = results_df.sort_values(by=['model', 'f1_score'], ascending=[True, False])
+    if 'f1_score' in results_df.columns:
+        results_df = results_df.sort_values(by=['model', 'f1_score'], ascending=[True, False])
+    
+    # Final summary
+    print(f"\n{'='*80}")
+    print(f"ALL EXPERIMENTS COMPLETED: {completed_experiments}/{total_experiments} successful")
+    print(f"{'='*80}")
     
     # Save to CSV
     csv_path = os.path.join(save_dir, 'experiment_results.csv')
@@ -227,14 +267,39 @@ def run_all_experiments(save_dir, epochs, early_stop, parallel=False):
     formatted_csv_path = os.path.join(save_dir, 'experiment_results_formatted.csv')
     formatted_df.to_csv(formatted_csv_path, index=False)
     
-    print(f"All experiments completed! Results saved to {csv_path}")
+    print(f"\nRESULTS SUMMARY:")
+    print(f"{'-'*50}")
+    print(f"Total experiments run:    {total_experiments}")
+    print(f"Successful experiments:   {completed_experiments}")
+    print(f"Failed experiments:       {total_experiments - completed_experiments}")
+    print(f"Results saved to:         {csv_path}")
+    print(f"Formatted results saved:  {formatted_csv_path}")
     
     # Create summary of best configurations per model
-    best_per_model = results_df.loc[results_df.groupby('model')['f1_score'].idxmax()]
-    best_csv_path = os.path.join(save_dir, 'best_configurations.csv')
-    best_per_model.to_csv(best_csv_path, index=False)
+    if 'f1_score' in results_df.columns and not results_df.empty:
+        best_per_model = results_df.loc[results_df.groupby('model')['f1_score'].idxmax()]
+        best_csv_path = os.path.join(save_dir, 'best_configurations.csv')
+        best_per_model.to_csv(best_csv_path, index=False)
+        
+        # Print best configurations
+        print(f"\nBEST CONFIGURATIONS FOR EACH MODEL:")
+        print(f"{'-'*50}")
+        for _, row in best_per_model.iterrows():
+            print(f"Model: {row['model']}")
+            print(f"  Optimizer: {row['optimizer']}")
+            print(f"  Scheduler: {row['scheduler']}")
+            print(f"  Learning Rate: {row['learning_rate']}")
+            print(f"  F1 Score: {row['f1_score']:.4f}")
+            print(f"  Accuracy: {row['val_acc']:.2f}%")
+            print()
+        
+        print(f"Best configurations saved to: {best_csv_path}")
+    else:
+        print("\nWarning: Could not determine best configurations (missing F1 scores or empty results)")
     
-    print(f"Best configuration for each model saved to {best_csv_path}")
+    print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*80}")
+    
     return results_df
 
 if __name__ == "__main__":
