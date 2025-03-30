@@ -6,7 +6,7 @@ This repository contains the implementation of a Graph Neural Network (GNN) appr
 
 PPI_GNN uses graph-based deep learning to model proteins as graphs and predict their interactions. The model leverages:
 
-- Graph Convolutional Networks (GCNs) and Graph Attention Networks (GATs)
+- Graph Convolutional Networks (GCNs), Graph Attention Networks (GATs), and Residual Graph Isomorphism Networks (ResGIN)
 - Protein sequence embeddings from SeqVec
 - Structural information encoded as node features and graph topology
 
@@ -141,7 +141,7 @@ This will create comprehensive visualizations including:
 ### Command Line Arguments
 
 Available arguments for training:
-- `--model`: Model architecture (`GCNN` or `AttGNN`)
+- `--model`: Model architecture (`GCNN`, `AttGNN`, or `ResGIN`)
 - `--epochs`: Number of training epochs
 - `--lr`: Learning rate
 - `--batch_size`: Batch size
@@ -161,7 +161,7 @@ python test.py --model GCNN --model_path human_features/GCNN.pth
 
 ## Model Architectures
 
-This repository provides two model architectures:
+This repository provides three model architectures:
 
 1. **GCNN**: Graph Convolutional Neural Network
    - Uses GCNConv layers for graph representation
@@ -170,6 +170,34 @@ This repository provides two model architectures:
 2. **AttGNN**: Graph Attention Network
    - Uses GAT layers with multi-head attention
    - Captures complex relationships between protein residues
+
+3. **ResGIN**: Residual Graph Isomorphism Network
+   - Combines Graph Isomorphism Networks (GIN) with residual connections
+   - Features a bottleneck MLP design in each GIN layer (128→256→128)
+   - Uses batch normalization and dropout for regularization
+   - Mathematical formulation:
+     ```
+     h_i^(l+1) = h_i^(l) + GINConv(h_i^(l), N(i))
+     ```
+   - Provides stronger gradient flow and deeper feature extraction
+   - Better captures structural patterns in protein graphs
+   - 4 GIN layers with residual connections for hierarchical feature extraction
+   - Parameter-efficient with approximately 280,000 trainable parameters
+   - Theoretical advantages in graph structure distinction over traditional GCN
+
+### Training the ResGIN Model
+
+To train the ResGIN model:
+
+```bash
+python train.py --model ResGIN --epochs 50 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 5 --save_dir resgin_results
+```
+
+For a quick test run of the ResGIN model:
+
+```bash
+python train.py --model ResGIN --epochs 5 --lr 0.0005 --optimizer radam --scheduler plateau --early_stop 3 --save_dir resgin_test
+```
 
 ## Visualization
 
