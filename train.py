@@ -24,7 +24,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
 from data_prepare import dataset, trainloader, testloader
-from models import GCNN, AttGNN
+from models import GCNN, AttGNN, ResGIN
 from torch_geometric.data import DataLoader as DataLoader_n
 
 
@@ -74,9 +74,9 @@ n_iterations = math.ceil(total_samples/5)
 def parse_arguments():
     parser = argparse.ArgumentParser(description='PPI-GNN: Training configuration')
     
-    # Model selection
-    parser.add_argument('--model', type=str, default='GCNN', choices=['GCNN', 'AttGNN'],
-                        help='Model architecture to train (GCNN, AttGNN)')
+    # Model selection (updated to include ResGIN)
+    parser.add_argument('--model', type=str, default='GCNN', choices=['GCNN', 'AttGNN', 'ResGIN'],
+                        help='Model architecture to train (GCNN, AttGNN, ResGIN)')
     
     # Training parameters
     parser.add_argument('--epochs', type=int, default=50,
@@ -289,6 +289,10 @@ def generate_results_summary(metrics, experiment_settings, save_dir, model_name)
         f.write("EXPERIMENT SETTINGS:\n")
         f.write("-------------------\n")
         for key, value in experiment_settings.items():
+            # Skip only GPU info in the output, keep date_time
+            if key in ['gpu_info']:
+                continue
+                
             if isinstance(value, dict):
                 f.write(f"{key}:\n")
                 for k, v in value.items():
@@ -372,13 +376,16 @@ def train_and_visualize(args):
     log_dir = os.path.join(args.save_dir, 'logs')
     os.makedirs(log_dir, exist_ok=True)
     
-    # Model setup based on argument
+    # Model setup based on argument (updated to include ResGIN)
     if args.model == 'GCNN':
         model = GCNN()
         model_name = 'GCNN'
     elif args.model == 'AttGNN':
         model = AttGNN()
         model_name = 'AttGNN'
+    elif args.model == 'ResGIN':
+        model = ResGIN()
+        model_name = 'ResGIN'
     else:
         raise ValueError(f"Unknown model type: {args.model}")
     

@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, GATConv, global_max_pool as gmp, global_add_pool as gap,global_mean_pool as gep,global_sort_pool
+from torch_geometric.nn import GCNConv, GATConv, GINConv, global_max_pool as gmp, global_add_pool as gap, global_mean_pool as gep, global_sort_pool
 from torch_geometric.utils import dropout_adj
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -158,4 +158,93 @@ class AttGNN(nn.Module):
 
 net_GAT = AttGNN()
 print(net_GAT)
+
+"""# Residual Graph Isomorphism Network"""
+
+class ResGIN(torch.nn.Module):
+    def __init__(self, n_output=1, num_features_pro=1024, output_dim=128, num_layers=4, dropout=0.2):
+        super(ResGIN, self).__init__()
+        
+        print('ResGIN Loaded')
+        
+        # Embedding layer for protein 1
+        self.pro1_embedding = nn.Linear(num_features_pro, output_dim)
+        
+        # GIN layers with residual connections for protein 1
+        self.pro1_gin_layers = nn.ModuleList()
+        for i in range(num_layers):
+            nn_layer1 = nn.Sequential(
+                nn.Linear(output_dim, output_dim*2),
+                nn.BatchNorm1d(output_dim*2),
+                nn.ReLU(),
+                nn.Linear(output_dim*2, output_dim)
+            )
+            self.pro1_gin_layers.append(GINConv(nn_layer1, eps=0.1, train_eps=True))
+        
+        # Embedding layer for protein 2
+        self.pro2_embedding = nn.Linear(num_features_pro, output_dim)
+        
+        # GIN layers with residual connections for protein 2
+        self.pro2_gin_layers = nn.ModuleList()
+        for i in range(num_layers):
+            nn_layer2 = nn.Sequential(
+                nn.Linear(output_dim, output_dim*2),
+                nn.BatchNorm1d(output_dim*2),
+                nn.ReLU(),
+                nn.Linear(output_dim*2, output_dim)
+            )
+            self.pro2_gin_layers.append(GINConv(nn_layer2, eps=0.1, train_eps=True))
+        
+        # Activation, dropout, and normalization
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        self.sigmoid = nn.Sigmoid()
+        
+        # Combined layers
+        self.fc1 = nn.Linear(2 * output_dim, 256)
+        self.fc2 = nn.Linear(256, 64)
+        self.out = nn.Linear(64, n_output)
+        
+    def forward(self, pro1_data, pro2_data):
+        # Process protein 1
+        x1 = self._process_protein(pro1_data, self.pro1_embedding, self.pro1_gin_layers)
+        
+        # Process protein 2
+        x2 = self._process_protein(pro2_data, self.pro2_embedding, self.pro2_gin_layers)
+        
+        # Concatenate protein representations
+        xc = torch.cat([x1, x2], dim=1)
+        
+        # Final classification layers
+        xc = self.fc1(xc)
+        xc = self.relu(xc)
+        xc = self.dropout(xc)
+        xc = self.fc2(xc)
+        xc = self.relu(xc)
+        xc = self.dropout(xc)
+        out = self.out(xc)
+        out = self.sigmoid(out)
+        
+        return out
+    
+    def _process_protein(self, protein_data, embedding_layer, gin_layers):
+        x, edge_index, batch = protein_data.x, protein_data.edge_index, protein_data.batch
+        
+        # Initial embedding
+        x = embedding_layer(x)
+        
+        # Apply GIN layers with residual connections
+        for gin in gin_layers:
+            x_new = gin(x, edge_index)
+            x = x + x_new  # Residual connection
+            x = self.relu(x)
+            x = self.dropout(x)
+        
+        # Global pooling to get graph-level representation
+        x = gep(x, batch)
+        
+        return x
+
+net_ResGIN = ResGIN()
+print(net_ResGIN)
 
